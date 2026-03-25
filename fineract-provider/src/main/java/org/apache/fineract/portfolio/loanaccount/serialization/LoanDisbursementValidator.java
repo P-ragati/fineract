@@ -19,10 +19,12 @@
 package org.apache.fineract.portfolio.loanaccount.serialization;
 
 import java.math.BigDecimal;
+import java.util.Locale;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.apache.fineract.infrastructure.core.service.DateUtils;
 import org.apache.fineract.infrastructure.core.service.MathUtil;
+import org.apache.fineract.organisation.monetary.domain.MoneyHelper;
 import org.apache.fineract.portfolio.loanaccount.domain.Loan;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanOverAppliedCalculationType;
 import org.apache.fineract.portfolio.loanproduct.domain.LoanProduct;
@@ -64,16 +66,17 @@ public final class LoanDisbursementValidator {
 
     private BigDecimal calculateMaxAllowedDisbursement(final Loan loan) {
         final LoanProduct loanProduct = loan.getLoanProduct();
-        final BigDecimal approvedPrincipal = loan.getApprovedPrincipal() != null ? loan.getApprovedPrincipal() : loan.getProposedPrincipal();
+        final BigDecimal approvedPrincipal = loan.getApprovedPrincipal() != null ? loan.getApprovedPrincipal()
+            : loan.getProposedPrincipal() != null ? loan.getProposedPrincipal() : BigDecimal.ZERO;
         BigDecimal maxAllowed = approvedPrincipal;
 
         if (loanProduct.getOverAppliedCalculationType() != null && loanProduct.getOverAppliedNumber() != null) {
             final BigDecimal overAppliedMax = BigDecimal.valueOf(loanProduct.getOverAppliedNumber());
             final LoanOverAppliedCalculationType calculationType = LoanOverAppliedCalculationType
-                    .valueOf(loanProduct.getOverAppliedCalculationType().toUpperCase());
+                    .valueOf(loanProduct.getOverAppliedCalculationType().toUpperCase(Locale.ROOT));
 
             if (calculationType.isPercentage()) {
-                final BigDecimal extra = approvedPrincipal.multiply(overAppliedMax).divide(BigDecimal.valueOf(100));
+                final BigDecimal extra = MathUtil.percentageOf(approvedPrincipal, overAppliedMax, MoneyHelper.getMathContext());
                 maxAllowed = approvedPrincipal.add(extra);
             } else {
                 maxAllowed = approvedPrincipal.add(overAppliedMax);
